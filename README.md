@@ -66,7 +66,7 @@ For example, Athens uses:
 ```text
 SITE=athens
 CONTENT_PATH=sites/athens
-REPOSITORY=thelocalpixel-star/shallowford-pi
+REPOSITORY=thelocalpixel-star/signage-pi-fleet
 REF=main
 ```
 

@@ -31,7 +31,7 @@ curl_retry_delay=${SIGNAGE_CURL_RETRY_DELAY:-10}
 
 SITE=shallowford
 CONTENT_PATH=
-REPOSITORY=thelocalpixel-star/shallowford-pi
+REPOSITORY=thelocalpixel-star/signage-pi-fleet
 REF=main
 
 case "$curl_retry:$curl_retry_delay" in

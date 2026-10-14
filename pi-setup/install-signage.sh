@@ -86,7 +86,7 @@ say "Installing site and schedule configuration"
   echo "SITE=$site"
   echo "SITE_LABEL=\"$site_label\""
   echo "CONTENT_PATH=$content_path"
-  echo "REPOSITORY=thelocalpixel-star/shallowford-pi"
+  echo "REPOSITORY=thelocalpixel-star/signage-pi-fleet"
   echo "REF=main"
 } > /etc/default/signage-site
 install -m 0644 "$script_dir/signage-schedule.conf" /etc/default/signage-schedule

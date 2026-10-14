@@ -4,7 +4,7 @@
 # Run ON THE PI as the admin user. Pass the configured site name; existing
 # Shallowford installations may omit it because shallowford is the default:
 #   curl -sSL -o /tmp/pi-bootstrap.sh \
-#     https://raw.githubusercontent.com/thelocalpixel-star/shallowford-pi/main/pi-setup/pi-bootstrap.sh \
+#     https://raw.githubusercontent.com/thelocalpixel-star/signage-pi-fleet/main/pi-setup/pi-bootstrap.sh \
 #   && sudo bash /tmp/pi-bootstrap.sh athens
 #
 # Installs the mode-aware scripts, the takeover revert watchdog timer,
@@ -13,7 +13,7 @@
 # prunes old releases, and triggers the health email. Ends with Celebrate live.
 set -eu
 
-REPO=thelocalpixel-star/shallowford-pi
+REPO=thelocalpixel-star/signage-pi-fleet
 RAW="https://raw.githubusercontent.com/$REPO/main"
 SIGNAGE_ROOT=/home/admin/signage
 site=${1:-shallowford}

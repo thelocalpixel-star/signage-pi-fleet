@@ -7,7 +7,7 @@ Read this file first. Use `README.md` only when detailed operator instructions a
 - Raspberry Pi 4 Model B, 2 GB RAM, Raspberry Pi OS Lite 64-bit (Debian Trixie).
 - Host: `pisignageshallowford.local`; SSH user: `admin`.
 - Display: Samsung HDMI display; its preferred mode is 3840x2160 at 30 Hz, so `start-signage.sh` forces HDMI-A-1 to 1920x1080 at 60 Hz after every Cage start.
-- GitHub source: `https://github.com/thelocalpixel-star/shallowford-pi`, branch `main`.
+- GitHub source: `https://github.com/thelocalpixel-star/signage-pi-fleet`, branch `main`.
 - Never put passwords, Gmail App Passwords, or Wi-Fi credentials in this repository.
 
 ## Required behavior

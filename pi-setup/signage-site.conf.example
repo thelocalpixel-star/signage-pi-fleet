@@ -7,5 +7,5 @@
 SITE=athens
 SITE_LABEL="Athens"
 CONTENT_PATH=sites/athens
-REPOSITORY=thelocalpixel-star/shallowford-pi
+REPOSITORY=thelocalpixel-star/signage-pi-fleet
 REF=main

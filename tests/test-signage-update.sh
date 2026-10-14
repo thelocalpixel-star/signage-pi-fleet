@@ -65,7 +65,7 @@ grep -q '^github-main-shallowford-normal$' "$deploy_log"
 cat > "$temp_dir/site-config" <<'EOF'
 SITE=athens
 CONTENT_PATH=sites/athens
-REPOSITORY=thelocalpixel-star/shallowford-pi
+REPOSITORY=thelocalpixel-star/signage-pi-fleet
 REF=main
 EOF
 printf 'MODE=takeover\n' > "$temp_dir/mode-config"
