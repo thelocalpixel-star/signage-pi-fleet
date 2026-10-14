@@ -1,9 +1,8 @@
 #!/bin/sh
 # Download only this Pi's site content and deploy it atomically.
 #
-# Existing Shallowford installations remain compatible: when no site config
-# exists, content is read from the repository root exactly as before. New
-# locations set SITE and CONTENT_PATH in /etc/default/signage-site.
+# Every location reads from its own directory under sites/. A Pi can override
+# the default with SITE and CONTENT_PATH in /etc/default/signage-site.
 set -eu
 
 check_only=0
@@ -30,7 +29,7 @@ curl_retry=${SIGNAGE_CURL_RETRY:-3}
 curl_retry_delay=${SIGNAGE_CURL_RETRY_DELAY:-10}
 
 SITE=shallowford
-CONTENT_PATH=
+CONTENT_PATH=sites/shallowford
 REPOSITORY=thelocalpixel-star/signage-pi-fleet
 REF=main
 

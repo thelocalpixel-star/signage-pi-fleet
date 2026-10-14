@@ -1,8 +1,8 @@
 # Copy to /etc/default/signage-site and set this Pi's location.
 #
-# Shallowford remains at the repository root for backward compatibility:
+# Each location uses its own directory:
 # SITE=shallowford
-# CONTENT_PATH=
+# CONTENT_PATH=sites/shallowford
 
 SITE=athens
 SITE_LABEL="Athens"

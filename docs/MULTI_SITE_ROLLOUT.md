@@ -57,8 +57,8 @@ After explicit approval for this device and action:
 
 1. Save dated copies of the two installed updater/deployer scripts.
 2. Install the reviewed scripts without changing content or display mode.
-3. Configure `SITE=shallowford` and an empty `CONTENT_PATH`.
-4. Run `sudo signage-update --check`. This downloads and validates the root
+3. Configure `SITE=shallowford` and `CONTENT_PATH=sites/shallowford`.
+4. Run `sudo signage-update --check`. This downloads and validates the
    Shallowford content but does not invoke the deployer or restart the kiosk.
 5. Run the updater normally only after the check succeeds.
 6. Verify the live heartbeat and health email before ending the session.
@@ -71,6 +71,6 @@ scripts provide the rollback path.
 ## Stage 5: promotion
 
 Merge to `main` only after separate approval and after both displays have been
-verified. Then change Athens from its pinned canary SHA to `REF=main`. Moving
-or deleting Shallowford's root content is a later migration and is not needed
-for multi-site operation.
+verified. Then change Athens from its pinned canary SHA to `REF=main`. Remove
+Shallowford's temporary root content only after its installed updater has
+successfully activated `sites/shallowford` and passed the post-update checks.

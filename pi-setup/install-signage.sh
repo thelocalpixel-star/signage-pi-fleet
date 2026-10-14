@@ -22,13 +22,8 @@ fi
 script_dir=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
 repo_root=$(dirname "$script_dir")
 
-if [ "$site" = "shallowford" ]; then
-  content_path=
-  content_dir=$repo_root
-else
-  content_path="sites/$site"
-  content_dir="$repo_root/$content_path"
-fi
+content_path="sites/$site"
+content_dir="$repo_root/$content_path"
 
 for required in index.html ad.mp4 takeover.html takeover.png; do
   [ -s "$content_dir/$required" ] || die "Missing site content: $content_dir/$required"

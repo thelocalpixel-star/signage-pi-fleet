@@ -10,7 +10,7 @@ The attached Samsung display advertises 4K at 30 Hz as its preferred mode. The k
 
 - The display plays every day from **10:00 AM until 10:00 PM Eastern time**.
 - At **8:00 AM**, the Pi downloads its configured site files from the `main` branch of this repository.
-- Shallowford's existing `index.html`, `takeover.html`, `takeover.png`, and `ad.mp4` remain at the repository root; new sites keep the same filenames under `sites/<site>/`.
+- Every location keeps the same four content filenames under `sites/<site>/`.
 - The screen has two display modes — normal ad and takeover (see below). The 8:00 AM download refreshes the content files but never changes the active mode.
 - An update is validated and installed as a new release before it becomes active.
 - If GitHub, Wi-Fi, DNS, or the download is unavailable, the update fails safely and the Pi continues using the last working release.
@@ -72,7 +72,9 @@ REF=main
 
 The configuration is stored on the Pi at `/etc/default/signage-site`. Site names use lowercase letters, numbers, and hyphens only.
 
-Shallowford remains backward-compatible during migration: if `/etc/default/signage-site` does not exist, the updater defaults to `SITE=shallowford` and reads the existing content files from the repository root. Do not move or delete the root content until the installed Shallowford updater has been audited, migrated, and verified.
+Shallowford uses `CONTENT_PATH=sites/shallowford`. During its remote migration,
+the former root content remains only as a rollback path until the installed
+updater and site configuration have been verified.
 
 Every successful deployment retains at most two releases: the active release and the newest rollback. Set `SIGNAGE_KEEP_RELEASES` only for a deliberate maintenance run; values below `2` are rejected.
 

@@ -34,17 +34,8 @@ if [ -z "$site_label" ]; then
   esac
 fi
 
-if [ "$site" = "shallowford" ]; then
-  content_path=
-else
-  content_path="sites/$site"
-fi
-
-if [ -n "$content_path" ]; then
-  content_url="$RAW/$content_path"
-else
-  content_url=$RAW
-fi
+content_path="sites/$site"
+content_url="$RAW/$content_path"
 
 say() { printf '\n==> %s\n' "$*"; }
 die() { echo "ERROR: $*" >&2; exit 1; }

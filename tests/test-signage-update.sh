@@ -6,7 +6,7 @@ temp_dir=$(mktemp -d /tmp/test-signage-update.XXXXXX)
 trap 'rm -rf "$temp_dir"' EXIT HUP INT TERM
 
 fixture="$temp_dir/repository"
-mkdir -p "$fixture/sites/athens"
+mkdir -p "$fixture/sites/athens" "$fixture/sites/shallowford"
 
 make_site() {
   directory=$1
@@ -17,7 +17,7 @@ make_site() {
   printf 'fake %s image\n' "$label" > "$directory/takeover.png"
 }
 
-make_site "$fixture" shallowford
+make_site "$fixture/sites/shallowford" shallowford
 make_site "$fixture/sites/athens" athens
 
 deploy_log="$temp_dir/deploy.log"
@@ -57,7 +57,7 @@ run_update() {
   )
 }
 
-# No config must preserve the deployed Shallowford root behavior.
+# No config defaults to the Shallowford site directory.
 run_update 'shallowford normal' 'shallowford video' \
   "$temp_dir/no-site-config" "$temp_dir/no-mode-config"
 grep -q '^github-main-shallowford-normal$' "$deploy_log"
