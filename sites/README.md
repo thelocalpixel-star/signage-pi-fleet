@@ -9,9 +9,9 @@ downloads these four files directly:
 - `takeover.html`
 - `takeover.png`
 
-Shallowford's former root files remain temporarily during its remote migration.
-They can be removed only after the installed updater has successfully validated
-and activated `sites/shallowford`.
+Location media must not be duplicated at the repository root. This keeps each
+Pi's update small and prevents one location from downloading another location's
+ads.
 
 To add a location, create `sites/<site>/` with all four required files. Use a
 lowercase site name containing only letters, numbers, and hyphens.

@@ -73,9 +73,9 @@ REF=main
 
 The configuration is stored on the Pi at `/etc/default/signage-site`. Site names use lowercase letters, numbers, and hyphens only.
 
-Shallowford uses `CONTENT_PATH=sites/shallowford`. During its remote migration,
-the former root content remains only as a rollback path until the installed
-updater and site configuration have been verified.
+Shallowford uses `CONTENT_PATH=sites/shallowford`; Athens uses
+`CONTENT_PATH=sites/athens`. Both installed updaters read only their configured
+site directory, so each Pi downloads only its own media.
 
 Every successful deployment retains at most two releases: the active release and the newest rollback. Set `SIGNAGE_KEEP_RELEASES` only for a deliberate maintenance run; values below `2` are rejected.
 

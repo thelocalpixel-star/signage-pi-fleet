@@ -39,7 +39,7 @@ case "$cmd" in
 esac
 
 # A mode change cancels any pending custom-takeover revert.
-systemctl stop "$REVERT_UNIT.service" 2>/dev/null || true
+systemctl stop "$REVERT_UNIT.timer" "$REVERT_UNIT.service" 2>/dev/null || true
 
 cur=$(readlink -f "$SIGNAGE_ROOT/current")
 

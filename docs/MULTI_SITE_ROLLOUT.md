@@ -1,36 +1,36 @@
-# Multi-site rollout
+# Multi-site rollout record
 
-This rollout treats Shallowford as a remote production display with no
-physical recovery path. Repository changes and Pi installation are separate
-approval gates.
+The Athens and Shallowford migration was completed on October 14, 2026. This
+record preserves the safety sequence for future locations and remote upgrades.
 
 ## Safety invariants
 
-- Keep Shallowford's root content files in place throughout the migration.
+- Keep a remote location's existing content path in place until its new path is
+  active and verified.
 - Never reboot Shallowford as part of an updater-only migration.
 - Never activate partially downloaded content.
 - Keep the active release plus the immediately previous active release.
-- Test new scripts on Athens before installing them on Shallowford.
-- Do not add large Athens media to `main` while Shallowford still uses the
-  archive-based updater; it would download every site's media.
+- Test new scripts on a reachable canary before installing them on a remote Pi.
+- Do not remove a legacy content path until every affected Pi uses
+  `CONTENT_PATH=sites/<site>`.
 
 ## Stage 1: local preparation
 
-1. Add all four Athens files under `sites/athens/`.
+1. Add all four location files under `sites/<site>/`.
 2. Run `tests/test-signage-update.sh` and shell syntax checks.
-3. Review the diff and confirm the Shallowford root files are unchanged.
+3. Review the diff and confirm existing location files are unchanged.
 
 No GitHub or Pi changes occur in this stage.
 
-## Stage 2: Athens canary
+## Stage 2: canary
 
 1. Push the reviewed work to a feature branch only after explicit approval.
-2. Configure Athens with `SITE=athens`, `CONTENT_PATH=sites/athens`, and an
+2. Configure the canary with its `SITE`, `CONTENT_PATH=sites/<site>`, and an
    immutable 40-character commit SHA in `REF`.
 3. Run `sudo signage-update --check` before the first activation.
-4. Activate Athens, then verify its screenshot, heartbeat, timers, temperature,
+4. Activate the canary, then verify its screenshot, heartbeat, timers, temperature,
    throttling state, active release, rollback release, SSH, and Pi Connect.
-5. Observe at least one scheduled 8:00 AM update before promoting the change.
+5. For high-risk changes, observe a scheduled 8:00 AM update before promotion.
 
 ## Stage 3: Shallowford read-only audit
 
@@ -48,7 +48,7 @@ vcgencmd measure_temp
 rpi-connect status
 ```
 
-Review the audit and Athens canary results before requesting permission to
+Review the audit and canary results before requesting permission to
 write anything on Shallowford.
 
 ## Stage 4: Shallowford migration
@@ -70,7 +70,19 @@ scripts provide the rollback path.
 
 ## Stage 5: promotion
 
-Merge to `main` only after separate approval and after both displays have been
-verified. Then change Athens from its pinned canary SHA to `REF=main`. Remove
-Shallowford's temporary root content only after its installed updater has
-successfully activated `sites/shallowford` and passed the post-update checks.
+Merge to `main` only after separate approval and after all displays have been
+verified. Change the canary from its pinned SHA to `REF=main`. Remove any legacy
+content path only after the installed updater has successfully activated the
+new site directory and passed the post-update checks.
+
+## 2026-10-14 result
+
+- Athens and Shallowford use `REPOSITORY=thelocalpixel-star/signage-pi-fleet`,
+  `REF=main`, and their own `sites/<site>` content paths.
+- Both Pis passed normal, default takeover, custom takeover, revert-timer
+  cancellation, Chromium heartbeat, health-email, thermal, and throttling
+  checks.
+- Shallowford's hosted control sync is enabled. Athens' control sync is tracked
+  separately from the site-content migration.
+- The duplicated Shallowford files at the repository root were removed after
+  successful remote activation.
