@@ -42,7 +42,8 @@ sudo signage-display-mode takeover /path/to/custom.png
 
 The 30-minute revert is enforced by a one-shot timer plus a per-minute watchdog (`signage-takeover-watch.timer`), so even a reboot cannot leave a custom image stuck. A pristine copy of the celebrate image is kept at `/home/admin/signage/celebrate.png` for reverts.
 
-After every mode switch, send a fresh health email so the new screen is confirmed visually:
+Every successful mode switch automatically queues a fresh health email so the
+new screen is confirmed visually. To request another report manually, run:
 
 ```bash
 sudo systemctl start signage-health-email.service

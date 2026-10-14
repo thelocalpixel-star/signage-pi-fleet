@@ -23,6 +23,12 @@ MODE_FILE=/etc/default/signage-mode
 CELEBRATE_IMG=/home/admin/signage/celebrate.png
 REVERT_UNIT=signage-takeover-revert
 
+trigger_health_email() {
+  if ! systemctl start --no-block signage-health-email.service; then
+    echo "Warning: could not queue the display confirmation email." >&2
+  fi
+}
+
 cmd=${1:-}
 case "$cmd" in
   normal|takeover) ;;
@@ -48,46 +54,60 @@ write_mode() {
 if [ "$cmd" = "normal" ]; then
   write_mode normal
   /usr/local/sbin/signage-deploy-files "$cur/normal.html" "$cur/ad.mp4" "mode-normal"
+  trigger_health_email
   echo "Normal ad + video active."
   exit 0
 fi
 
 # --- takeover ---
 arg=${2:-}
-if [ "$arg" = "--revert" ]; then
-  write_mode takeover
-  if [ -f "$CELEBRATE_IMG" ]; then
-    cp "$CELEBRATE_IMG" "$cur/takeover.png"
-    chown admin:admin "$cur/takeover.png"
-  fi
-  if systemctl is-active --quiet getty@tty1.service; then
-    systemctl restart getty@tty1.service
-  fi
-  echo "Takeover reverted to the celebrate image."
-  exit 0
-fi
+takeover_image=$CELEBRATE_IMG
+takeover_source=mode-takeover-celebrate
+takeover_message='Celebrate takeover active.'
+custom_takeover=false
 
-write_mode takeover
-/usr/local/sbin/signage-deploy-files "$cur/takeover.html" "$cur/ad.mp4" "mode-takeover"
-new_cur=$(readlink -f "$SIGNAGE_ROOT/current")
-
-if [ -n "$arg" ]; then
+if [ -n "$arg" ] && [ "$arg" != "--revert" ]; then
   if [ ! -s "$arg" ]; then
     echo "Custom image missing or empty: $arg" >&2
     exit 1
   fi
-  cp "$arg" "$new_cur/takeover.png"
-  chown admin:admin "$new_cur/takeover.png"
+  takeover_image=$arg
+  takeover_source=mode-takeover-custom
+  takeover_message='Custom takeover active for 30 minutes.'
+  custom_takeover=true
+elif [ "$arg" = "--revert" ]; then
+  takeover_message='Takeover reverted to the celebrate image.'
+fi
+
+if [ ! -s "$CELEBRATE_IMG" ]; then
+  echo "Celebrate image missing or empty: $CELEBRATE_IMG" >&2
+  exit 1
+fi
+
+# Build the release with its final image before activation. This keeps the
+# release hash accurate and prevents Chromium from briefly loading a stale
+# takeover image after the kiosk restarts.
+takeover_stage=$(mktemp -d "$SIGNAGE_ROOT/.takeover.XXXXXX")
+trap 'rm -rf "$takeover_stage"' EXIT HUP INT TERM
+install -m 0644 "$cur/takeover.html" "$takeover_stage/takeover.html"
+install -m 0644 "$cur/normal.html" "$takeover_stage/normal.html"
+install -m 0644 "$takeover_image" "$takeover_stage/takeover.png"
+
+/usr/local/sbin/signage-deploy-files \
+  "$takeover_stage/takeover.html" "$cur/ad.mp4" "$takeover_source"
+rm -rf "$takeover_stage"
+trap - EXIT HUP INT TERM
+
+if [ "$custom_takeover" = true ]; then
   until=$(( $(date +%s) + 1800 ))
   write_mode takeover "$until"
   # One-shot revert in 30 minutes (lost on reboot; the per-minute
   # signage-takeover-watch timer is the backstop).
   systemd-run --on-active=30min --unit="$REVERT_UNIT" \
     /usr/local/sbin/signage-display-mode takeover --revert
-  if systemctl is-active --quiet getty@tty1.service; then
-    systemctl restart getty@tty1.service
-  fi
-  echo "Custom takeover active for 30 minutes."
 else
-  echo "Celebrate takeover active."
+  write_mode takeover
 fi
+
+trigger_health_email
+echo "$takeover_message"
