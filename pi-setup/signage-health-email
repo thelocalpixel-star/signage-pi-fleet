@@ -5,6 +5,14 @@ email_config=/etc/signage-email/msmtprc
 recipient=thelocalpixel@gmail.com
 screenshot_dir=/home/admin/signage/screenshots
 report_dir=/run/signage-health-email
+site_config=/etc/default/signage-site
+site_label=Shallowford
+
+if [ -r "$site_config" ]; then
+  # shellcheck disable=SC1090
+  . "$site_config"
+  site_label=${SITE_LABEL:-${SITE:-Shallowford}}
+fi
 
 install -d -m 0755 -o admin -g admin "$screenshot_dir"
 install -d -m 0700 "$report_dir"
@@ -152,7 +160,7 @@ ipv4_address=$(hostname -I 2>/dev/null | tr ' ' '\n' | awk '/^[0-9]+\./ { print;
 [ -n "$ipv4_address" ] || ipv4_address=Unavailable
 
 report_time=$(date '+%B %-d, %Y at %-I:%M %p %Z')
-subject="Shallowford Signage - $status - $(date '+%-I:%M %p')"
+subject="$site_label Signage - $status - $(date '+%-I:%M %p')"
 
 status_html=$(html_escape "$status")
 summary_html=$(html_escape "$summary")
@@ -164,15 +172,16 @@ next_download_html=$(html_escape "$next_download")
 wifi_ssid_html=$(html_escape "$wifi_ssid")
 ipv4_html=$(html_escape "$ipv4_address")
 uptime_html=$(html_escape "$uptime_display")
+site_label_html=$(html_escape "$site_label")
 
 cat > "$html_report" <<EOF
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Shallowford Signage Health</title></head>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>$site_label_html Signage Health</title></head>
 <body style="margin:0;padding:0;background:#f3f6f4;color:#17241d;font-family:Arial,Helvetica,sans-serif;">
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#f3f6f4;"><tr><td align="center" style="padding:24px 12px;">
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:720px;background:#fff;border:1px solid #dde6e1;border-radius:14px;overflow:hidden;">
 <tr><td style="padding:26px 30px;background:#12382a;color:#fff;">
-  <div style="font-size:13px;letter-spacing:1.3px;text-transform:uppercase;color:#b9d8ca;font-weight:bold;">Shallowford Digital Signage</div>
+  <div style="font-size:13px;letter-spacing:1.3px;text-transform:uppercase;color:#b9d8ca;font-weight:bold;">$site_label_html Digital Signage</div>
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-top:10px;"><tr>
     <td style="font-size:27px;line-height:34px;font-weight:bold;color:#fff;">System report</td>
     <td align="right"><span style="display:inline-block;padding:8px 13px;border-radius:20px;background:$status_background;color:$status_color;font-size:14px;font-weight:bold;">$status_html</span></td>
@@ -245,7 +254,7 @@ EOF
 
 boundary="signage-report-$(date +%s)-$$"
 {
-  printf 'From: Shallowford Pi <%s>\r\n' "$recipient"
+  printf 'From: %s Pi <%s>\r\n' "$site_label" "$recipient"
   printf 'To: %s\r\n' "$recipient"
   printf 'Subject: %s\r\n' "$subject"
   printf 'Date: %s\r\n' "$(date -R)"

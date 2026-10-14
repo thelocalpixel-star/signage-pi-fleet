@@ -1,14 +1,16 @@
-# Shallowford Raspberry Pi Digital Signage
+# Multi-site Raspberry Pi Digital Signage
 
-This Raspberry Pi drives a 1920×1080 digital sign with two display modes: the normal ad (`index.html` looping `ad.mp4`) and a full-screen takeover (`takeover.html` showing `takeover.png`). It uses Raspberry Pi OS Lite, Cage (a minimal Wayland kiosk), and Chromium. There is no full desktop environment.
+This project drives 1920×1080 digital signs with two display modes: the normal ad (`index.html` looping `ad.mp4`) and a full-screen takeover (`takeover.html` showing `takeover.png`). It uses Raspberry Pi OS Lite, Cage (a minimal Wayland kiosk), and Chromium. There is no full desktop environment.
+
+Each Pi selects its location through `/etc/default/signage-site`. The updater downloads only that location's four content files, so adding ads for other locations does not consume bandwidth or storage on the Pi. See [Multi-site content](#multi-site-content).
 
 The attached Samsung display advertises 4K at 30 Hz as its preferred mode. The kiosk launcher deliberately changes `HDMI-A-1` to **1920×1080 at 60 Hz** inside every new Cage session before Chromium is allowed to start. It continues checking every five seconds while Chromium runs because turning the TV off and on creates an HDMI hotplug event that can restore the TV's preferred 4K mode. This reduces Chromium/GPU memory use and keeps the scrolling ticker smooth. Do not remove the continuous `wlr-randr` mode enforcement from `start-signage.sh`.
 
 ## Normal operation
 
 - The display plays every day from **10:00 AM until 10:00 PM Eastern time**.
-- At **8:00 AM**, the Pi downloads the `main` branch of this repository.
-- `index.html`, `takeover.html`, `takeover.png`, and `ad.mp4` must remain in the repository root and keep those exact names.
+- At **8:00 AM**, the Pi downloads its configured site files from the `main` branch of this repository.
+- Shallowford's existing `index.html`, `takeover.html`, `takeover.png`, and `ad.mp4` remain at the repository root; new sites keep the same filenames under `sites/<site>/`.
 - The screen has two display modes — normal ad and takeover (see below). The 8:00 AM download refreshes the content files but never changes the active mode.
 - An update is validated and installed as a new release before it becomes active.
 - If GitHub, Wi-Fi, DNS, or the download is unavailable, the update fails safely and the Pi continues using the last working release.
@@ -49,6 +51,54 @@ sudo systemctl start signage-health-email.service
 The `admin` user has passwordless sudo for exactly these signage commands (see `pi-setup/signage-sudoers`), so routine switches never need an interactive password.
 
 The Pi uses the `America/New_York` time zone, which automatically handles Eastern Standard Time and Eastern Daylight Time.
+
+## Multi-site content
+
+Shared scripts live in `pi-setup/`; location-specific content lives under `sites/<site>/`. A configured Pi downloads only these files from its own content path:
+
+- `index.html`
+- `ad.mp4`
+- `takeover.html`
+- `takeover.png`
+
+For example, Athens uses:
+
+```text
+SITE=athens
+CONTENT_PATH=sites/athens
+REPOSITORY=thelocalpixel-star/shallowford-pi
+REF=main
+```
+
+The configuration is stored on the Pi at `/etc/default/signage-site`. Site names use lowercase letters, numbers, and hyphens only.
+
+Shallowford remains backward-compatible during migration: if `/etc/default/signage-site` does not exist, the updater defaults to `SITE=shallowford` and reads the existing content files from the repository root. Do not move or delete the root content until the installed Shallowford updater has been audited, migrated, and verified.
+
+Every successful deployment retains at most two releases: the active release and the newest rollback. Set `SIGNAGE_KEEP_RELEASES` only for a deliberate maintenance run; values below `2` are rejected.
+
+The optional hosted control panel uses `signage-control-sync.timer`. It starts a
+one-shot process once per minute, makes an outbound HTTPS request, reports
+health, applies queued commands atomically, and exits. It is not enabled by the
+installer and has no effect until `/etc/signage-control.conf` is installed with
+mode `0600` and the timer is deliberately enabled for that location.
+
+`start-signage.sh` removes disposable Chromium cache data at session start and
+caps disk and media caches at 64 MB each. The daily schedule stops Chromium
+outside playback hours, so its memory is fully released rather than accumulating
+across days. Do not impose a hard memory limit on Chromium; the watchdog and
+daily restart provide recovery without risking video decode failures.
+
+Follow `docs/MULTI_SITE_ROLLOUT.md` for the staged Athens canary and remote-safe Shallowford migration. `signage-update --check` downloads and validates a site's content without activating it or restarting the kiosk.
+
+### Fresh Pi installation
+
+Copy this repository to a newly imaged Pi, then run the fresh-system installer from the repository root:
+
+```bash
+sudo ./pi-setup/install-signage.sh athens "Athens"
+```
+
+The installer adds only the kiosk packages, shared scripts, systemd units, site configuration, and that site's local content. It starts the kiosk for verification but deliberately leaves the playback schedule, watchdog, GitHub updater, and health-email timer disabled. Enable each automation only after its prerequisite verification or configuration has succeeded.
 
 ## Offline playback and automatic recovery
 
@@ -359,4 +409,4 @@ sudo /usr/local/sbin/signage-deploy-files \
 | Takeover revert watchdog | `/usr/local/sbin/signage-takeover-watch` |
 | Passwordless sudo rules | `/etc/sudoers.d/signage` |
 
-The automatic updater downloads `index.html`, `takeover.html`, `takeover.png`, and `ad.mp4` from the repository, then activates the page matching the current display mode. Changes to the setup scripts themselves must be installed deliberately.
+The automatic updater downloads `index.html`, `takeover.html`, `takeover.png`, and `ad.mp4` from the configured site path, then activates the page matching the current display mode. Changes to the setup scripts themselves must be installed deliberately.

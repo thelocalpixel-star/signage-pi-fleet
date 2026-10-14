@@ -1,48 +1,202 @@
 #!/bin/sh
-# Download the signage content from GitHub and deploy it.
-# The display mode persists across updates: the download refreshes all
-# content files, but which page goes live follows /etc/default/signage-mode,
-# so the 8am update can never clobber an active takeover.
+# Download only this Pi's site content and deploy it atomically.
+#
+# Existing Shallowford installations remain compatible: when no site config
+# exists, content is read from the repository root exactly as before. New
+# locations set SITE and CONTENT_PATH in /etc/default/signage-site.
 set -eu
 
-archive_url=${SIGNAGE_ARCHIVE_URL:-https://codeload.github.com/thelocalpixel-star/shallowford-pi/tar.gz/refs/heads/main}
+check_only=0
+case "$#" in
+  0) ;;
+  1)
+    if [ "$1" = "--check" ]; then
+      check_only=1
+    else
+      echo "Usage: signage-update [--check]" >&2
+      exit 2
+    fi
+    ;;
+  *)
+    echo "Usage: signage-update [--check]" >&2
+    exit 2
+    ;;
+esac
+
+site_config=${SIGNAGE_SITE_CONFIG_FILE:-/etc/default/signage-site}
+mode_config=${SIGNAGE_MODE_CONFIG_FILE:-/etc/default/signage-mode}
+deploy_command=${SIGNAGE_DEPLOY_COMMAND:-/usr/local/sbin/signage-deploy-files}
+curl_retry=${SIGNAGE_CURL_RETRY:-3}
+curl_retry_delay=${SIGNAGE_CURL_RETRY_DELAY:-10}
+
+SITE=shallowford
+CONTENT_PATH=
+REPOSITORY=thelocalpixel-star/shallowford-pi
+REF=main
+
+case "$curl_retry:$curl_retry_delay" in
+  *[!0-9:]*|:*|*:)
+    echo "SIGNAGE_CURL_RETRY and SIGNAGE_CURL_RETRY_DELAY must be non-negative numbers." >&2
+    exit 1
+    ;;
+esac
+
+if [ -f "$site_config" ]; then
+  # shellcheck disable=SC1090
+  . "$site_config"
+fi
+
+case "$SITE" in
+  ''|*[!a-z0-9-]*)
+    echo "Invalid SITE in $site_config: $SITE" >&2
+    exit 1
+    ;;
+esac
+
+if ! printf '%s\n' "$REPOSITORY" | grep -Eq '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$'; then
+  echo "Invalid REPOSITORY in $site_config: $REPOSITORY" >&2
+  exit 1
+fi
+
+case "$REF" in
+  ''|*..*|*[!A-Za-z0-9._-]*)
+    echo "Invalid REF in $site_config: $REF" >&2
+    exit 1
+    ;;
+esac
+
+case "$CONTENT_PATH" in
+  /*|*/|*..*|*[!A-Za-z0-9._/-]*)
+    echo "Invalid CONTENT_PATH in $site_config: $CONTENT_PATH" >&2
+    exit 1
+    ;;
+esac
+
+if [ -n "${SIGNAGE_CONTENT_BASE_URL:-}" ]; then
+  # Test and controlled-mirror override. Production GitHub downloads resolve
+  # the branch to a commit below so every file comes from one snapshot.
+  repository_base=$SIGNAGE_CONTENT_BASE_URL
+  resolved_ref=$REF
+else
+  if printf '%s\n' "$REF" | grep -Eq '^[0-9a-f]{40}$'; then
+    resolved_ref=$REF
+  else
+    ref_response=$(mktemp /tmp/signage-ref.XXXXXX)
+    trap 'rm -f "$ref_response"' EXIT HUP INT TERM
+    curl \
+      --fail \
+      --location \
+      --silent \
+      --show-error \
+      --connect-timeout 20 \
+      --max-time 60 \
+      --retry "$curl_retry" \
+      --retry-delay "$curl_retry_delay" \
+      --retry-all-errors \
+      --header 'Accept: application/vnd.github+json' \
+      --header 'X-GitHub-Api-Version: 2022-11-28' \
+      --output "$ref_response" \
+      "https://api.github.com/repos/$REPOSITORY/commits/$REF"
+    resolved_ref=$(sed -n 's/^[[:space:]]*"sha": "\([0-9a-f]\{40\}\)",$/\1/p' "$ref_response" | head -1)
+    rm -f "$ref_response"
+    trap - EXIT HUP INT TERM
+    if [ "${#resolved_ref}" -ne 40 ]; then
+      echo "Could not resolve $REPOSITORY ref $REF to a commit." >&2
+      exit 1
+    fi
+  fi
+  repository_base="https://raw.githubusercontent.com/$REPOSITORY/$resolved_ref"
+fi
+if [ -n "$CONTENT_PATH" ]; then
+  content_base="$repository_base/$CONTENT_PATH"
+else
+  content_base=$repository_base
+fi
+
 work_dir=$(mktemp -d /tmp/signage-update.XXXXXX)
 trap 'rm -rf "$work_dir"' EXIT HUP INT TERM
+content_dir="$work_dir/content"
+mkdir "$content_dir"
 
-echo "Downloading signage from GitHub..."
-curl \
-  --fail \
-  --location \
-  --silent \
-  --show-error \
-  --connect-timeout 20 \
-  --max-time 600 \
-  --retry 3 \
-  --retry-delay 10 \
-  --retry-all-errors \
-  --output "$work_dir/signage.tar.gz" \
-  "$archive_url"
+fetch() {
+  file_name=$1
+  echo "Downloading $SITE/$file_name..."
+  curl \
+    --fail \
+    --location \
+    --silent \
+    --show-error \
+    --connect-timeout 20 \
+    --max-time 600 \
+    --retry "$curl_retry" \
+    --retry-delay "$curl_retry_delay" \
+    --retry-all-errors \
+    --output "$content_dir/$file_name" \
+    "$content_base/$file_name"
+}
 
-mkdir "$work_dir/extracted"
-tar -xzf "$work_dir/signage.tar.gz" \
-  -C "$work_dir/extracted" \
-  --strip-components=1
+# Keep this list deliberately small. A Pi downloads only the assets required
+# by its player, regardless of how many other sites live in the repository.
+fetch index.html
+fetch ad.mp4
+fetch takeover.html
+fetch takeover.png
+
+# Validate the complete temporary download before selecting or activating a
+# page. --check exits after these same checks and never invokes the deployer.
+for required_file in index.html ad.mp4 takeover.html takeover.png; do
+  if [ ! -s "$content_dir/$required_file" ]; then
+    echo "Downloaded content is missing or empty: $required_file" >&2
+    exit 1
+  fi
+done
+
+for html_file in index.html takeover.html; do
+  if ! grep -Eqi '<!doctype|<html' "$content_dir/$html_file"; then
+    echo "HTML validation failed: $html_file" >&2
+    exit 1
+  fi
+done
+
+video_type=$(file -b "$content_dir/ad.mp4")
+case "$video_type" in
+  *ISO\ Media*|*MPEG*|*MP4*) ;;
+  *)
+    echo "MP4 validation failed: $video_type" >&2
+    exit 1
+    ;;
+esac
+
+# Make the normal page explicit so a release can always switch modes later,
+# regardless of which mode happened to be active during this update.
+cp "$content_dir/index.html" "$content_dir/normal.html"
 
 mode=normal
-if [ -f /etc/default/signage-mode ]; then
-  # shellcheck disable=SC1091
-  . /etc/default/signage-mode
+if [ -f "$mode_config" ]; then
+  # shellcheck disable=SC1090
+  . "$mode_config"
   mode=${MODE:-normal}
 fi
 
-if [ "$mode" = "takeover" ]; then
-  page="$work_dir/extracted/takeover.html"
-  source_name="github-main-takeover"
-else
-  page="$work_dir/extracted/index.html"
-  source_name="github-main"
+case "$mode" in
+  normal)
+    page="$content_dir/index.html"
+    ;;
+  takeover)
+    page="$content_dir/takeover.html"
+    ;;
+  *)
+    echo "Invalid MODE in $mode_config: $mode" >&2
+    exit 1
+    ;;
+esac
+
+source_ref=$(printf '%s' "$resolved_ref" | cut -c1-12)
+source_name="github-$source_ref-$SITE-$mode"
+if [ "$check_only" -eq 1 ]; then
+  echo "Signage update check passed (site=$SITE, mode=$mode, ref=$source_ref)."
+  exit 0
 fi
 
-/usr/local/sbin/signage-deploy-files "$page" "$work_dir/extracted/ad.mp4" "$source_name"
-
-echo "GitHub signage update completed successfully (mode=$mode)."
+"$deploy_command" "$page" "$content_dir/ad.mp4" "$source_name"
+echo "GitHub signage update completed successfully (site=$SITE, mode=$mode)."

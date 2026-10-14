@@ -1,0 +1,11 @@
+# Copy to /etc/default/signage-site and set this Pi's location.
+#
+# Shallowford remains at the repository root for backward compatibility:
+# SITE=shallowford
+# CONTENT_PATH=
+
+SITE=athens
+SITE_LABEL="Athens"
+CONTENT_PATH=sites/athens
+REPOSITORY=thelocalpixel-star/shallowford-pi
+REF=main

@@ -8,6 +8,19 @@
 set -eu
 
 SIGNAGE_ROOT=/home/admin/signage
+MAX_RELEASES=${SIGNAGE_KEEP_RELEASES:-2}
+
+case "$MAX_RELEASES" in
+  ''|*[!0-9]*)
+    echo "SIGNAGE_KEEP_RELEASES must be a number of at least 2." >&2
+    exit 1
+    ;;
+esac
+
+if [ "$MAX_RELEASES" -lt 2 ]; then
+  echo "SIGNAGE_KEEP_RELEASES must keep the active release and one rollback." >&2
+  exit 1
+fi
 
 if [ "$(id -u)" -ne 0 ]; then
   echo "Run this command with sudo." >&2
@@ -80,6 +93,51 @@ release_target="releases/$release_id"
 
 install -d -o admin -g admin "$SIGNAGE_ROOT/releases"
 
+prune_releases() {
+  preferred_rollback=${1:-}
+  current_real=$(readlink -f "$SIGNAGE_ROOT/current" 2>/dev/null || true)
+  [ -n "$current_real" ] || return 0
+  current_id=$(basename "$current_real")
+  kept=1
+
+  case "$preferred_rollback" in
+    *[!0-9a-f]*|'') preferred_rollback= ;;
+  esac
+  if [ -n "$preferred_rollback" ] && [ "${#preferred_rollback}" -ne 16 ]; then
+    preferred_rollback=
+  fi
+  if [ -n "$preferred_rollback" ] && \
+     [ -d "$SIGNAGE_ROOT/releases/$preferred_rollback" ] && \
+     [ "$preferred_rollback" != "$current_id" ]; then
+    kept=$((kept + 1))
+  else
+    preferred_rollback=
+  fi
+
+  # Release paths are fixed, hash-named directories and therefore contain no
+  # whitespace. Sort by modification time so the newest non-active release is
+  # always retained as the rollback.
+  for candidate in $(ls -1dt "$SIGNAGE_ROOT"/releases/* 2>/dev/null || true); do
+    [ -d "$candidate" ] || continue
+    candidate_id=$(basename "$candidate")
+    [ "$candidate_id" = "$current_id" ] && continue
+    [ "$candidate_id" = "$preferred_rollback" ] && continue
+
+    case "$candidate_id" in
+      *[!0-9a-f]*|'') continue ;;
+    esac
+    [ "${#candidate_id}" -eq 16 ] || continue
+
+    if [ "$kept" -lt "$MAX_RELEASES" ]; then
+      kept=$((kept + 1))
+      continue
+    fi
+
+    echo "Pruning old signage release: $candidate_id"
+    rm -rf -- "$candidate"
+  done
+}
+
 if [ ! -d "$release_dir" ]; then
   temp_release="$SIGNAGE_ROOT/releases/.$release_id.$$"
   trap 'rm -rf "$temp_release"' EXIT HUP INT TERM
@@ -106,8 +164,11 @@ fi
 current_target=$(readlink "$SIGNAGE_ROOT/current" 2>/dev/null || true)
 if [ "$current_target" = "$release_target" ]; then
   echo "Signage is already current: $release_id"
+  prune_releases
   exit 0
 fi
+
+previous_id=$(basename "$current_target")
 
 next_link="$SIGNAGE_ROOT/.current.$$"
 ln -s "$release_target" "$next_link"
@@ -119,3 +180,5 @@ echo "Activated signage release: $release_id ($source_name)"
 if systemctl is-active --quiet getty@tty1.service; then
   systemctl restart getty@tty1.service
 fi
+
+prune_releases "$previous_id"

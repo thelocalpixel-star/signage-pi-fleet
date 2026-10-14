@@ -1,10 +1,11 @@
 #!/bin/sh
 # pi-bootstrap.sh — one-shot installer for the signage display-mode architecture.
 #
-# Run ON THE PI as the admin user:
+# Run ON THE PI as the admin user. Pass the configured site name; existing
+# Shallowford installations may omit it because shallowford is the default:
 #   curl -sSL -o /tmp/pi-bootstrap.sh \
 #     https://raw.githubusercontent.com/thelocalpixel-star/shallowford-pi/main/pi-setup/pi-bootstrap.sh \
-#   && sudo bash /tmp/pi-bootstrap.sh
+#   && sudo bash /tmp/pi-bootstrap.sh athens
 #
 # Installs the mode-aware scripts, the takeover revert watchdog timer,
 # passwordless sudo for signage commands, sets the standing Celebrate
@@ -15,6 +16,35 @@ set -eu
 REPO=thelocalpixel-star/shallowford-pi
 RAW="https://raw.githubusercontent.com/$REPO/main"
 SIGNAGE_ROOT=/home/admin/signage
+site=${1:-shallowford}
+site_label=${2:-}
+
+case "$site" in
+  ''|*[!a-z0-9-]*)
+    echo "ERROR: invalid site name: $site" >&2
+    exit 1
+    ;;
+esac
+
+if [ -z "$site_label" ]; then
+  case "$site" in
+    shallowford) site_label=Shallowford ;;
+    athens) site_label=Athens ;;
+    *) site_label=$site ;;
+  esac
+fi
+
+if [ "$site" = "shallowford" ]; then
+  content_path=
+else
+  content_path="sites/$site"
+fi
+
+if [ -n "$content_path" ]; then
+  content_url="$RAW/$content_path"
+else
+  content_url=$RAW
+fi
 
 say() { printf '\n==> %s\n' "$*"; }
 die() { echo "ERROR: $*" >&2; exit 1; }
@@ -42,6 +72,17 @@ for f in signage-update signage-deploy-files signage-display-mode signage-takeov
   sh -n "/usr/local/sbin/$f" || die "syntax check failed: $f"
 done
 
+say "Configuring site: $site"
+{
+  echo "SITE=$site"
+  echo "SITE_LABEL=\"$site_label\""
+  echo "CONTENT_PATH=$content_path"
+  echo "REPOSITORY=$REPO"
+  echo "REF=main"
+} > /etc/default/signage-site
+chown root:root /etc/default/signage-site
+chmod 0644 /etc/default/signage-site
+
 say "Installing takeover-watch systemd units"
 fetch "$RAW/pi-setup/signage-takeover-watch.service" \
   /etc/systemd/system/signage-takeover-watch.service 0644
@@ -61,7 +102,7 @@ su - admin -s /bin/sh -c 'sudo -k; sudo -n /usr/local/sbin/signage-takeover-watc
 
 say "Fetching pristine Celebrate image"
 install -d -o admin -g admin "$SIGNAGE_ROOT"
-fetch "$RAW/takeover.png" "$SIGNAGE_ROOT/celebrate.png" 0644
+fetch "$content_url/takeover.png" "$SIGNAGE_ROOT/celebrate.png" 0644
 chown admin:admin "$SIGNAGE_ROOT/celebrate.png"
 
 say "Setting standing mode: takeover (Celebrate)"

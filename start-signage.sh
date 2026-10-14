@@ -5,6 +5,13 @@ setterm --blank 0 --powerdown 0 --powersave off 2>/dev/null || true
 
 export XDG_RUNTIME_DIR="/run/user/$(id -u)"
 
+# Chromium's cache is disposable for this fully local player. Clear it once
+# per kiosk session and cap new caches so long-running Pis do not slowly lose
+# disk space or carry stale GPU data across daily restarts.
+profile=/home/admin/.config/chromium-signage
+rm -rf "$profile/Default/Cache" "$profile/Default/Code Cache" \
+  "$profile/Default/GPUCache" "$profile/ShaderCache" 2>/dev/null || true
+
 # The Samsung display advertises 3840x2160 at 30 Hz as its preferred mode.
 # Force 1080p at 60 Hz after every Cage start so Chromium renders one quarter
 # as many pixels and the scrolling ticker is not limited to 30 fps.
@@ -44,7 +51,15 @@ while true; do
       --disable-infobars \
       --disable-session-crashed-bubble \
       --disable-background-networking \
+      --disable-component-update \
+      --disable-default-apps \
+      --disable-extensions \
+      --disable-sync \
       --disable-features=Translate \
+      --disk-cache-size=67108864 \
+      --media-cache-size=67108864 \
+      --no-pings \
+      --process-per-site \
       --remote-debugging-address=127.0.0.1 \
       --remote-debugging-port=9222 \
       --autoplay-policy=no-user-gesture-required \

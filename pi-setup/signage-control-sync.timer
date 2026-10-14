@@ -1,0 +1,11 @@
+[Unit]
+Description=Check the signage control panel every minute
+
+[Timer]
+OnBootSec=90s
+OnUnitActiveSec=60s
+AccuracySec=5s
+Unit=signage-control-sync.service
+
+[Install]
+WantedBy=timers.target

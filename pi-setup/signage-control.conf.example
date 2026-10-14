@@ -1,0 +1,4 @@
+# Install as /etc/signage-control.conf with mode 0600.
+API_BASE_URL=https://your-control-panel.vercel.app
+LOCATION_ID=athens
+DEVICE_TOKEN=replace-with-a-long-random-token

@@ -1,0 +1,14 @@
+[Unit]
+Description=Poll the signage control panel and report device health
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/signage-control-sync
+Nice=10
+IOSchedulingClass=idle
+TimeoutStartSec=12min
+
+[Install]
+WantedBy=multi-user.target
