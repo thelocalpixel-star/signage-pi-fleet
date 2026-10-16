@@ -16,6 +16,10 @@ from pathlib import Path
 CONFIG = Path("/etc/signage-control.conf")
 SIGNAGE_ROOT = Path("/home/admin/signage")
 COMMAND_STATE = Path("/var/lib/signage-control/command-results.json")
+# Screenshots are the dominant Vercel Blob bandwidth cost. Only upload one
+# every N sync runs (each run is ~1 minute) instead of every run.
+SCREENSHOT_EVERY_N_RUNS = 30
+SCREENSHOT_COUNTER = Path("/var/lib/signage-control/screenshot-counter")
 
 
 def read_config(path):
@@ -116,6 +120,27 @@ def apply_media(media):
         run("/usr/local/sbin/signage-deploy-files", str(page), str(bundle / "ad.mp4"), f"control-{media['id'][:12]}")
         if kind == "takeover":
             run("/usr/local/sbin/signage-display-mode", "takeover", str(target))
+
+
+def should_capture_screenshot(force):
+    """True at most once every SCREENSHOT_EVERY_N_RUNS runs, or when forced.
+
+    Falls back to capturing (previous behavior) if the counter file cannot be
+    read or written, so a disk problem never silently kills visibility.
+    """
+    if force:
+        return True
+    try:
+        count = int(SCREENSHOT_COUNTER.read_text(encoding="utf-8").strip() or "0")
+    except (FileNotFoundError, ValueError):
+        count = 0
+    count += 1
+    try:
+        SCREENSHOT_COUNTER.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        SCREENSHOT_COUNTER.write_text(str(count), encoding="utf-8")
+    except OSError:
+        return True
+    return count % SCREENSHOT_EVERY_N_RUNS == 0
 
 
 def capture_screen(destination):
@@ -237,7 +262,8 @@ def main():
     health = health_snapshot()
     health["commandResults"] = command_results
     capture = Path(tempfile.gettempdir()) / f"signage-capture-{os.getpid()}.png"
-    has_capture = capture_screen(capture) if force_capture or health["chromiumProcesses"] else False
+    want_capture = bool(force_capture or health["chromiumProcesses"])
+    has_capture = capture_screen(capture) if (want_capture and should_capture_screenshot(force_capture)) else False
     try:
         boundary, body = multipart_body({"health": json.dumps(health)}, capture if has_capture else None)
         request_json(
